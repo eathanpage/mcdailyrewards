@@ -1,0 +1,8 @@
+name: DailyRewards
+version: 1.0
+main: com.garfield.dailyRewards.Main
+api-version: 1.21.4
+commands:
+  daily:
+    description: Claim your daily reward.
+    usage: /daily
