@@ -14,6 +14,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.Sound;
 
 import java.io.*;
 import java.lang.reflect.Type;
@@ -131,6 +132,26 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         }
     }
 
+    private void playRaritySound(Player player, String rarity) {
+        switch (rarity.toLowerCase()) {
+            case "common":
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_YES, 1.0f, 1.0f);
+                break;
+            case "uncommon":
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                break;
+            case "rare":
+                player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.0f, 1.0f);
+                break;
+            case "legendary":
+                player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
+                break;
+            default:
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.0f);
+                break;
+        }
+    }
+
     private boolean giveDailyReward(Player player, PlayerData playerData) {
         int streak = playerData.getStreak() + 1;
         playerData.setStreak(streak);
@@ -150,6 +171,9 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
 
         // Give the reward to the player
         player.getInventory().addItem(rewardResult.getItemStack());
+
+        // Play sound based on the rarity
+        playRaritySound(player, rewardResult.getRarity());
 
         // Send a message to the player about the reward
         String rarityColor = getRarityColor(rewardResult.getRarity());
