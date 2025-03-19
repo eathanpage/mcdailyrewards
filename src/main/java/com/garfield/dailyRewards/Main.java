@@ -28,7 +28,7 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
 
     private File streaksFile; // File for saving streaks and last reward dates
     private File rewardsFile; // File for reward configuration
-    private List<RewardCategory> rewardCategories; // List of reward categories (common, uncommon, rare, legendary)
+    private Map<String, RewardCategory> rewardCategories; // List of reward categories (common, uncommon, rare, legendary)
     private Gson gson;
 
     @Override
@@ -43,7 +43,7 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         rewardsFile = new File(getDataFolder(), "rewards.json");
 
         // Initialize rewardCategories
-        rewardCategories = new ArrayList<>(); // Initialize the list
+        rewardCategories = new HashMap<>();
 
         // Configure Gson with a custom LocalDate adapter
         gson = new GsonBuilder()
@@ -155,28 +155,44 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
     private boolean giveDailyReward(Player player, PlayerData playerData) {
         int streak = playerData.getStreak() + 1;
         playerData.setStreak(streak);
-
-        // Check if the player's inventory is full
         if (player.getInventory().firstEmpty() == -1) {
             player.sendMessage("§cIt looks like your inventory is full. Please free up a space in your inventory and run §e/daily§c again.");
-            return false; // Reward was not given
+            return false;
         }
 
-        // Get a random reward based on the player's streak
-        RewardResult rewardResult = getRandomReward();
+        RewardResult rewardResult;
+        if (streak % 7 == 0) {
+            player.sendMessage("§6§l7-day streak!");
+            RewardCategory category = rewardCategories.get("rare");
+            int random = new Random().nextInt(100);
+            if (random < 25) {
+                category = rewardCategories.get("legendary");
+            }
+            if (category != null) {
+                rewardResult = getRewardFromCategory(category);
+            } else {
+                rewardResult = getRandomReward();
+            }
+        } else {
+            rewardResult = getRandomReward();
+        }
+
         if (rewardResult == null) {
             player.sendMessage("§cAn error occurred while generating your reward. Please contact an administrator.");
-            return false; // Reward was not given
+            return false;
         }
 
         // Give the reward to the player
         player.getInventory().addItem(rewardResult.getItemStack());
-
-        // Play sound based on the rarity
         playRaritySound(player, rewardResult.getRarity());
-
-        // Send a message to the player about the reward
         String rarityColor = getRarityColor(rewardResult.getRarity());
+        getLogger().info(String.format("%s received %dx %s, which is a %s item! They are on a streak of %d.",
+                player.getName(),
+                rewardResult.getItemStack().getAmount(),
+                rewardResult.getItemStack().getType().toString().toLowerCase().replace("_", " "),
+                rewardResult.getRarity().toUpperCase(),
+                streak
+        ));
         player.sendMessage(String.format(
                 "§aYou received §e%d§ax %s, which is a %s§l%s§a item! You are on a streak of §e§l%s§a, keep it up!",
                 rewardResult.getItemStack().getAmount(),
@@ -186,19 +202,19 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
                 streak
         ));
 
-        return true; // Reward was successfully given
+        return true;
     }
 
     private RewardResult getRandomReward() {
         Random random = new Random();
-        double totalWeight = rewardCategories.stream()
+        double totalWeight = rewardCategories.values().stream()
                 .mapToDouble(RewardCategory::getChance)
                 .sum();
 
         double randomValue = random.nextDouble() * totalWeight;
         double cumulativeWeight = 0;
 
-        for (RewardCategory category : rewardCategories) {
+        for (RewardCategory category : rewardCategories.values()) {
             cumulativeWeight += category.getChance();
 
             if (randomValue <= cumulativeWeight) {
@@ -209,6 +225,15 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
             }
         }
 
+        // Fallback reward if something goes wrong
+        return new RewardResult(new ItemStack(Material.IRON_INGOT, 1), "common");
+    }
+
+    private RewardResult getRewardFromCategory(RewardCategory category) {
+        RewardItem rewardItem = category.getRandomReward();
+        if (rewardItem != null) {
+            return new RewardResult(rewardItem.toItemStack(), category.getName());
+        }
         // Fallback reward if something goes wrong
         return new RewardResult(new ItemStack(Material.IRON_INGOT, 1), "common");
     }
@@ -285,8 +310,8 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
                 // Parse the reward items for this category
                 List<RewardItem> rewards = parseRewardItems(rewardsArray);
 
-                // Create a new RewardCategory and add it to the list
-                rewardCategories.add(new RewardCategory(categoryName, rewards, chance));
+                // Create a new RewardCategory and add it to the map
+                rewardCategories.put(categoryName, new RewardCategory(categoryName, rewards, chance));
             }
         } catch (IOException e) {
             e.printStackTrace();
