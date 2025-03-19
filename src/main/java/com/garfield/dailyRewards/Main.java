@@ -165,7 +165,7 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
             player.sendMessage("§6§l7-day streak!");
             RewardCategory category = rewardCategories.get("rare");
             int random = new Random().nextInt(100);
-            if (random < 15) {
+            if (random <= 15) {
                 category = rewardCategories.get("legendary");
             }
             if (category != null) {
