@@ -1,0 +1,76 @@
+common: #
+  color: "§7"
+  sound: "ENTITY_VILLAGER_YES"
+  rewards:
+    - material: IRON_INGOT
+      minAmount: 1
+      maxAmount: 3
+    - material: COAL
+      minAmount: 3
+      maxAmount: 10
+  chance: 0.50
+
+uncommon:
+  color: "§a"
+  sound: "ENTITY_PLAYER_LEVELUP"
+  rewards:
+    - material: GOLD_INGOT
+      minAmount: 1
+      maxAmount: 3
+    - material: DIAMOND
+      minAmount: 1
+      maxAmount: 3
+  chance: 0.30
+
+rare:
+  color: "§9"
+  sound: "ENTITY_ENDER_DRAGON_GROWL"
+  rewards:
+    - material: TOTEM_OF_UNDYING
+      minAmount: 1
+      maxAmount: 1
+    - material: STICK
+      minAmount: 1
+      maxAmount: 1
+      enchantments:
+        - enchantment: KNOCKBACK
+          level: 2
+  chance: 0.15
+
+legendary:
+  color: "§6"
+  sound: "UI_TOAST_CHALLENGE_COMPLETE"
+  rewards:
+    - material: DIAMOND_SWORD
+      minAmount: 1
+      maxAmount: 1
+      enchantments:
+        - enchantment: SHARPNESS
+          level: 5
+        - enchantment: LOOTING
+          level: 3
+        - enchantment: MENDING
+          level: 1
+        - enchantment: SWEEPING_EDGE
+          level: 3
+        - enchantment: KNOCKBACK
+          level: 2
+        - enchantment: FIRE_ASPECT
+          level: 2
+    - material: ELYTRA
+      minAmount: 1
+      maxAmount: 1
+  chance: 0.05
+
+# Structure of each category:
+# categoryName:
+#   color: "§<color_code>"  # Minecraft color code for the rarity
+#   sound: "<sound_name>"  # Sound to play when the reward is given
+#   rewards:
+#     - material: <MATERIAL_NAME>  # Type of item
+#       minAmount: <MIN_AMOUNT>  # Minimum amount of the item
+#       maxAmount: <MAX_AMOUNT>  # Maximum amount of the item
+#       enchantments:  # (Optional) List of enchantments
+#         - enchantment: <ENCHANTMENT_NAME>  # Type of enchantment
+#           level: <LEVEL>  # Level of the enchantment
+#   chance: <CHANCE>  # Chance of receiving a reward from this category

@@ -10,11 +10,15 @@ public class RewardCategory {
     private String name;
     private List<RewardItem> rewards;
     private double chance;
+    private String rarityColor;
+    private String raritySound;
 
-    public RewardCategory(String name, List<RewardItem> rewards, double chance) {
+    public RewardCategory(String name, List<RewardItem> rewards, double chance, String rarityColor, String raritySound) {
         this.name = name;
         this.rewards = rewards;
         this.chance = chance;
+        this.rarityColor = rarityColor;
+        this.raritySound = raritySound;
     }
 
     public String getName() {
@@ -27,6 +31,14 @@ public class RewardCategory {
 
     public double getChance() {
         return chance;
+    }
+
+    public String getRarityColor() {
+        return rarityColor;
+    }
+
+    public String getRaritySound() {
+        return raritySound;
     }
 
     public RewardItem getRandomReward() {

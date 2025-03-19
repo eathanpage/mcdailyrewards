@@ -1,13 +1,14 @@
 package com.garfield.dailyRewards;
 
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.Constructor;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -40,7 +41,7 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
 
         // Initialize files
         streaksFile = new File(getDataFolder(), "streaks.json");
-        rewardsFile = new File(getDataFolder(), "rewards.json");
+        rewardsFile = new File(getDataFolder(), "rewards.yaml");
 
         // Initialize rewardCategories
         rewardCategories = new HashMap<>();
@@ -132,23 +133,16 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         }
     }
 
-    private void playRaritySound(Player player, String rarity) {
-        switch (rarity.toLowerCase()) {
-            case "common":
-                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_YES, 1.0f, 1.0f);
-                break;
-            case "uncommon":
-                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
-                break;
-            case "rare":
-                player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.0f, 1.0f);
-                break;
-            case "legendary":
-                player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
-                break;
-            default:
-                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.0f);
-                break;
+    private void playRaritySound(Player player, String raritySound) {
+        if (raritySound != null && !raritySound.isEmpty()) {
+            try {
+                Sound sound = Sound.valueOf(raritySound);
+                player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
+            } catch (IllegalArgumentException e) {
+                getLogger().warning("Invalid sound: " + raritySound);
+            }
+        } else {
+            getLogger().warning("Rarity sound is null or empty.");
         }
     }
 
@@ -184,8 +178,8 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
 
         // Give the reward to the player
         player.getInventory().addItem(rewardResult.getItemStack());
-        playRaritySound(player, rewardResult.getRarity());
-        String rarityColor = getRarityColor(rewardResult.getRarity());
+        playRaritySound(player, rewardResult.getRaritySound());
+        String rarityColor = rewardResult.getRarityColor();
         getLogger().info(String.format("%s received %dx %s, which is a %s item! They are on a streak of %d.",
                 player.getName(),
                 rewardResult.getItemStack().getAmount(),
@@ -220,37 +214,22 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
             if (randomValue <= cumulativeWeight) {
                 RewardItem rewardItem = category.getRandomReward();
                 if (rewardItem != null) {
-                    return new RewardResult(rewardItem.toItemStack(), category.getName());
+                    return new RewardResult(rewardItem.toItemStack(), category.getName(), category.getRarityColor(), category.getRaritySound());
                 }
             }
         }
 
         // Fallback reward if something goes wrong
-        return new RewardResult(new ItemStack(Material.IRON_INGOT, 1), "common");
+        return new RewardResult(new ItemStack(Material.IRON_INGOT, 1), "common", "§f", "ENTITY_VILLAGER_YES");
     }
 
     private RewardResult getRewardFromCategory(RewardCategory category) {
         RewardItem rewardItem = category.getRandomReward();
         if (rewardItem != null) {
-            return new RewardResult(rewardItem.toItemStack(), category.getName());
+            return new RewardResult(rewardItem.toItemStack(), category.getName(), category.getRarityColor(), category.getRaritySound());
         }
         // Fallback reward if something goes wrong
-        return new RewardResult(new ItemStack(Material.IRON_INGOT, 1), "common");
-    }
-
-    private String getRarityColor(String rarity) {
-        switch (rarity.toLowerCase()) {
-            case "common":
-                return "§f"; // White
-            case "uncommon":
-                return "§a"; // Green
-            case "rare":
-                return "§9"; // Blue
-            case "legendary":
-                return "§6"; // Gold
-            default:
-                return "§f"; // Default to white
-        }
+        return new RewardResult(new ItemStack(Material.IRON_INGOT, 1), "common", "§f", "ENTITY_VILLAGER_YES");
     }
 
     private Map<UUID, PlayerData> loadStreaks() {
@@ -290,62 +269,58 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
 
     private void loadRewards() {
         if (!rewardsFile.exists()) {
-            getLogger().severe("rewards.json does not exist! Please create the file with the correct structure.");
+            getLogger().severe("rewards.yaml does not exist! Please create the file with the correct structure.");
             return;
         }
 
         try (Reader reader = new FileReader(rewardsFile)) {
-            // Parse the JSON as a JsonObject
-            JsonObject jsonObject = JsonParser.parseReader(reader).getAsJsonObject();
+            Yaml yaml = new Yaml(new Constructor(new LoaderOptions()));
+            Map<String, Map<String, Object>> yamlData = yaml.load(reader);
 
-            // Iterate through each category in the JSON object
-            for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
-                String categoryName = entry.getKey(); // e.g., "common", "uncommon", etc.
-                JsonObject categoryObject = entry.getValue().getAsJsonObject();
+            for (Map.Entry<String, Map<String, Object>> entry : yamlData.entrySet()) {
+                String categoryName = entry.getKey();
+                Map<String, Object> categoryData = entry.getValue();
 
-                // Extract the rewards and chance for this category
-                double chance = categoryObject.get("chance").getAsDouble();
-                JsonArray rewardsArray = categoryObject.getAsJsonArray("rewards");
+                double chance = ((Number) categoryData.get("chance")).doubleValue();
+                String rarityColor = (String) categoryData.get("color");
+                String raritySound = (String) categoryData.get("sound");
+                List<Map<String, Object>> rewardsList = (List<Map<String, Object>>) categoryData.get("rewards");
 
-                // Parse the reward items for this category
-                List<RewardItem> rewards = parseRewardItems(rewardsArray);
-
-                // Create a new RewardCategory and add it to the map
-                rewardCategories.put(categoryName, new RewardCategory(categoryName, rewards, chance));
+                List<RewardItem> rewards = parseRewardItems(rewardsList);
+                rewardCategories.put(categoryName, new RewardCategory(categoryName, rewards, chance, rarityColor, raritySound));
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private List<RewardItem> parseRewardItems(JsonArray jsonArray) {
+    private List<RewardItem> parseRewardItems(List<Map<String, Object>> rewardsList) {
         List<RewardItem> rewardItems = new ArrayList<>();
-        if (jsonArray == null) {
+        if (rewardsList == null) {
             return rewardItems;
         }
 
-        for (JsonElement element : jsonArray) {
-            JsonObject rewardObject = element.getAsJsonObject();
-            Material material = Material.valueOf(rewardObject.get("material").getAsString());
-            int minAmount = rewardObject.get("minAmount").getAsInt();
-            int maxAmount = rewardObject.get("maxAmount").getAsInt();
-            List<EnchantmentData> enchantments = parseEnchantments(rewardObject.getAsJsonArray("enchantments"));
+        for (Map<String, Object> rewardData : rewardsList) {
+            Material material = Material.valueOf((String) rewardData.get("material"));
+            int minAmount = ((Number) rewardData.get("minAmount")).intValue();
+            int maxAmount = ((Number) rewardData.get("maxAmount")).intValue();
+            List<Map<String, Object>> enchantmentsList = (List<Map<String, Object>>) rewardData.get("enchantments");
+            List<EnchantmentData> enchantments = parseEnchantments(enchantmentsList);
             rewardItems.add(new RewardItem(material, minAmount, maxAmount, enchantments));
         }
 
         return rewardItems;
     }
 
-    private List<EnchantmentData> parseEnchantments(JsonArray jsonArray) {
+    private List<EnchantmentData> parseEnchantments(List<Map<String, Object>> enchantmentsList) {
         List<EnchantmentData> enchantments = new ArrayList<>();
-        if (jsonArray == null) {
+        if (enchantmentsList == null) {
             return enchantments;
         }
 
-        for (JsonElement element : jsonArray) {
-            JsonObject enchantmentObject = element.getAsJsonObject();
-            String enchantment = enchantmentObject.get("enchantment").getAsString();
-            int level = enchantmentObject.get("level").getAsInt();
+        for (Map<String, Object> enchantmentData : enchantmentsList) {
+            String enchantment = (String) enchantmentData.get("enchantment");
+            int level = ((Number) enchantmentData.get("level")).intValue();
             enchantments.add(new EnchantmentData(enchantment, level));
         }
 
