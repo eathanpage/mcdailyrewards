@@ -1,4 +1,4 @@
-common: #
+common:
   color: "§7"
   sound: "ENTITY_VILLAGER_YES"
   rewards:

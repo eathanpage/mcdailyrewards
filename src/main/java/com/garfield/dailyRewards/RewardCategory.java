@@ -1,8 +1,4 @@
 package com.garfield.dailyRewards;
-
-import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
-
 import java.util.List;
 import java.util.Random;
 
@@ -23,10 +19,6 @@ public class RewardCategory {
 
     public String getName() {
         return name;
-    }
-
-    public List<RewardItem> getRewards() {
-        return rewards;
     }
 
     public double getChance() {

@@ -25,37 +25,34 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
+/**
+ * Main class for the DailyRewards plugin.
+ */
 public class Main extends JavaPlugin implements Listener, CommandExecutor {
 
-    private File streaksFile; // File for saving streaks and last reward dates
-    private File rewardsFile; // File for reward configuration
-    private Map<String, RewardCategory> rewardCategories; // List of reward categories (common, uncommon, rare, legendary)
+    private File streaksFile;
+    private File rewardsFile;
+    private Map<String, RewardCategory> rewardCategories;
     private Gson gson;
 
     @Override
     public void onEnable() {
-        // Ensure the data folder exists
         if (!getDataFolder().exists()) {
             getDataFolder().mkdirs();
         }
 
-        // Initialize files
         streaksFile = new File(getDataFolder(), "streaks.json");
         rewardsFile = new File(getDataFolder(), "rewards.yaml");
 
-        // Initialize rewardCategories
         rewardCategories = new HashMap<>();
 
-        // Configure Gson with a custom LocalDate adapter
         gson = new GsonBuilder()
                 .registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
                 .create();
 
-        // Register events and command
         getServer().getPluginManager().registerEvents(this, this);
-        getCommand("daily").setExecutor(this); // Register the /daily command
+        getCommand("daily").setExecutor(this);
 
-        // Load rewards configuration
         loadRewards();
     }
 
@@ -68,8 +65,7 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("daily")) {
-            if (sender instanceof Player) {
-                Player player = (Player) sender;
+            if (sender instanceof Player player) {
                 checkDailyReward(player);
             } else {
                 sender.sendMessage("§cOnly players can use this command.");
@@ -79,9 +75,14 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         return false;
     }
 
+    /**
+     * Gets the time until midnight.
+     *
+     * @return A string representing the time until midnight.
+     */
     private String getTimeUntilMidnight() {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime midnight = now.toLocalDate().plusDays(1).atStartOfDay(); // Next midnight
+        LocalDateTime midnight = now.toLocalDate().plusDays(1).atStartOfDay();
         Duration duration = Duration.between(now, midnight);
 
         long hours = duration.toHours();
@@ -91,6 +92,11 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         return String.format("%02d hours, %02d minutes, and %02d seconds", hours, minutes, seconds);
     }
 
+    /**
+     * Checks and gives the daily reward to the player.
+     *
+     * @param player The player to check and give the reward to.
+     */
     private void checkDailyReward(Player player) {
         UUID uuid = player.getUniqueId();
         Map<UUID, PlayerData> streaksData = loadStreaks();
@@ -102,30 +108,23 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         if (lastRewardDate != null) {
             long daysSinceLastReward = ChronoUnit.DAYS.between(lastRewardDate, currentDate);
 
-            // Check if more than 1 day has passed since the last reward
             if (daysSinceLastReward >= 1) {
-                // If more than 2 days have passed, reset the streak
                 if (daysSinceLastReward >= 2) {
                     playerData.setStreak(0);
                     player.sendMessage("§cYour login streak has been reset because you didn't log in for a day.");
                 }
 
-                // Attempt to give the reward
                 if (giveDailyReward(player, playerData)) {
-                    // Only update the last reward date if the reward was successfully given
                     playerData.setLastRewardDate(currentDate);
                     streaksData.put(uuid, playerData);
                     saveStreaks(streaksData);
                 }
             } else {
-                // Calculate time until midnight and send the countdown message
                 String timeUntilMidnight = getTimeUntilMidnight();
                 player.sendMessage("§eYou have already claimed your daily reward today. Come back in " + timeUntilMidnight + "!");
             }
         } else {
-            // First-time reward
             if (giveDailyReward(player, playerData)) {
-                // Only update the last reward date if the reward was successfully given
                 playerData.setLastRewardDate(currentDate);
                 streaksData.put(uuid, playerData);
                 saveStreaks(streaksData);
@@ -133,7 +132,13 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         }
     }
 
-    private void playRaritySound(Player player, String raritySound) {
+    /**
+     * Plays sound to the player
+     *
+     * @param player The player to play the sound to.
+     * @param raritySound The sound to play.
+     */
+    private void playSound(Player player, String raritySound) {
         if (raritySound != null && !raritySound.isEmpty()) {
             try {
                 Sound sound = Sound.valueOf(raritySound);
@@ -142,10 +147,17 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
                 getLogger().warning("Invalid sound: " + raritySound);
             }
         } else {
-            getLogger().warning("Rarity sound is null or empty.");
+            getLogger().warning("Sound is null or empty.");
         }
     }
 
+    /**
+     * Gives the daily reward to the player.
+     *
+     * @param player The player to give the reward to.
+     * @param playerData The player's data.
+     * @return True if the reward was successfully given, false otherwise.
+     */
     private boolean giveDailyReward(Player player, PlayerData playerData) {
         int streak = playerData.getStreak() + 1;
         playerData.setStreak(streak);
@@ -171,14 +183,8 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
             rewardResult = getRandomReward();
         }
 
-        if (rewardResult == null) {
-            player.sendMessage("§cAn error occurred while generating your reward. Please contact an administrator.");
-            return false;
-        }
-
-        // Give the reward to the player
         player.getInventory().addItem(rewardResult.getItemStack());
-        playRaritySound(player, rewardResult.getRaritySound());
+        playSound(player, rewardResult.getRaritySound());
         String rarityColor = rewardResult.getRarityColor();
         getLogger().info(String.format("%s received %dx %s, which is a %s item! They are on a streak of %d.",
                 player.getName(),
@@ -199,6 +205,11 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         return true;
     }
 
+    /**
+     * Gets a random reward from the reward categories.
+     *
+     * @return A RewardResult object containing the reward details.
+     */
     private RewardResult getRandomReward() {
         Random random = new Random();
         double totalWeight = rewardCategories.values().stream()
@@ -211,6 +222,9 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         for (RewardCategory category : rewardCategories.values()) {
             cumulativeWeight += category.getChance();
 
+            // getLogger().info("Random value: " + randomValue);
+            // getLogger().info("Cumulative weight: " + cumulativeWeight);
+
             if (randomValue <= cumulativeWeight) {
                 RewardItem rewardItem = category.getRandomReward();
                 if (rewardItem != null) {
@@ -219,19 +233,28 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
             }
         }
 
-        // Fallback reward if something goes wrong
         return new RewardResult(new ItemStack(Material.IRON_INGOT, 1), "common", "§f", "ENTITY_VILLAGER_YES");
     }
 
+    /**
+     * Gets a reward from a specific category.
+     *
+     * @param category The reward category.
+     * @return A RewardResult object containing the reward details.
+     */
     private RewardResult getRewardFromCategory(RewardCategory category) {
         RewardItem rewardItem = category.getRandomReward();
         if (rewardItem != null) {
             return new RewardResult(rewardItem.toItemStack(), category.getName(), category.getRarityColor(), category.getRaritySound());
         }
-        // Fallback reward if something goes wrong
         return new RewardResult(new ItemStack(Material.IRON_INGOT, 1), "common", "§f", "ENTITY_VILLAGER_YES");
     }
 
+    /**
+     * Loads the streaks data from the streaks file.
+     *
+     * @return A map of UUIDs to PlayerData objects.
+     */
     private Map<UUID, PlayerData> loadStreaks() {
         if (!streaksFile.exists()) {
             return new HashMap<>();
@@ -243,7 +266,7 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
 
             Map<UUID, PlayerData> streaksData = new HashMap<>();
             for (Map.Entry<String, PlayerData> entry : tempData.entrySet()) {
-                UUID uuid = UUID.fromString(entry.getKey()); // Convert string to UUID
+                UUID uuid = UUID.fromString(entry.getKey());
                 streaksData.put(uuid, entry.getValue());
             }
 
@@ -254,6 +277,11 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         }
     }
 
+    /**
+     * Saves player streaks to streaks.json.
+     *
+     * @param streaksData A map of UUIDs to PlayerData objects.
+     */
     private void saveStreaks(Map<UUID, PlayerData> streaksData) {
         Map<String, PlayerData> dataMap = new HashMap<>();
         for (Map.Entry<UUID, PlayerData> entry : streaksData.entrySet()) {
@@ -267,6 +295,9 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         }
     }
 
+    /**
+     * Loads rewards from rewards.yml
+     */
     private void loadRewards() {
         if (!rewardsFile.exists()) {
             getLogger().severe("rewards.yaml does not exist! Please create the file with the correct structure.");
@@ -276,24 +307,31 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         try (Reader reader = new FileReader(rewardsFile)) {
             Yaml yaml = new Yaml(new Constructor(new LoaderOptions()));
             Map<String, Map<String, Object>> yamlData = yaml.load(reader);
-
+            int totalRewardCount = 0;
             for (Map.Entry<String, Map<String, Object>> entry : yamlData.entrySet()) {
                 String categoryName = entry.getKey();
                 Map<String, Object> categoryData = entry.getValue();
 
                 double chance = ((Number) categoryData.get("chance")).doubleValue();
-                String rarityColor = (String) categoryData.get("color");
-                String raritySound = (String) categoryData.get("sound");
+                String color = (String) categoryData.get("color");
+                String sound = (String) categoryData.get("sound");
                 List<Map<String, Object>> rewardsList = (List<Map<String, Object>>) categoryData.get("rewards");
-
                 List<RewardItem> rewards = parseRewardItems(rewardsList);
-                rewardCategories.put(categoryName, new RewardCategory(categoryName, rewards, chance, rarityColor, raritySound));
+                rewardCategories.put(categoryName, new RewardCategory(categoryName, rewards, chance, color, sound));
+                totalRewardCount += rewards.size();
             }
+            getLogger().info(totalRewardCount + " items loaded from rewards.yml!");
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Parses the reward items from the rewards list.
+     *
+     * @param rewardsList The list of rewards.
+     * @return A list of RewardItem objects.
+     */
     private List<RewardItem> parseRewardItems(List<Map<String, Object>> rewardsList) {
         List<RewardItem> rewardItems = new ArrayList<>();
         if (rewardsList == null) {
@@ -312,6 +350,12 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor {
         return rewardItems;
     }
 
+    /**
+     * Parses the enchantments from the enchantments list.
+     *
+     * @param enchantmentsList The list of enchantments.
+     * @return A list of EnchantmentData objects.
+     */
     private List<EnchantmentData> parseEnchantments(List<Map<String, Object>> enchantmentsList) {
         List<EnchantmentData> enchantments = new ArrayList<>();
         if (enchantmentsList == null) {

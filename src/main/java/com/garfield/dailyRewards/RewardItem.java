@@ -20,22 +20,6 @@ public class RewardItem {
         this.enchantments = enchantments;
     }
 
-    public Material getMaterial() {
-        return material;
-    }
-
-    public int getMinAmount() {
-        return minAmount;
-    }
-
-    public int getMaxAmount() {
-        return maxAmount;
-    }
-
-    public List<EnchantmentData> getEnchantments() {
-        return enchantments;
-    }
-
     public ItemStack toItemStack() {
         Random random = new Random();
         int amount = minAmount + random.nextInt(maxAmount - minAmount + 1);
